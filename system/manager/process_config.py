@@ -108,7 +108,14 @@ def and_(*fns):
 def mqtt_enabled(started: bool, params: Params, CP: car.CarParams) -> bool:
   return params.get_bool("MqttEnabled")
 
+
+def web_ui_enabled(CP: car.CarParams, sm: messaging.SubMaster, pm: messaging.PubMaster) -> bool:
+  # The Web UI runs constantly unless explicitly disabled
+  return True
+
 procs = [
+  PythonProcess("webd", "selfdrive.web_ui.webd", web_ui_enabled),
+
   DaemonProcess("manage_athenad", "system.athena.manage_athenad", "AthenadPid"),
 
   NativeProcess("loggerd", "system/loggerd", ["./loggerd"], logging),

@@ -64,6 +64,46 @@ def inject_mqtt():
     else:
         print("paho-mqtt already exists in pyproject.toml")
 
+    # Patch Developer UI for MQTT features
+    developer_ui_path = os.path.join(base_dir, 'selfdrive', 'ui', 'mici', 'layouts', 'settings', 'developer.py')
+    if os.path.exists(developer_ui_path):
+        with open(developer_ui_path, 'r') as f:
+            content = f.read()
+        
+        dirty = False
+        
+        if "self._mqtt_toggle = BigCircleParamControl" not in content:
+            toggle_def = '    self._mqtt_toggle = BigCircleParamControl(gui_app.texture("icons_mici/mqtt_short.png", 82, 82), "MqttEnabled", icon_offset=(0, 12))\n'
+            anchor1 = '    self._adb_toggle = BigCircleParamControl'
+            if anchor1 in content:
+                content = content.replace(anchor1, toggle_def + anchor1)
+                dirty = True
+
+        try:
+            widgets_block = content.split("self._scroller.add_widgets([")[1].split("]")[0]
+            if "self._mqtt_toggle" not in widgets_block:
+                anchor2 = '      self._adb_toggle,'
+                if anchor2 in content:
+                    content = content.replace(anchor2, anchor2 + "\n      self._mqtt_toggle,")
+                    dirty = True
+        except IndexError:
+            pass
+
+        try:
+            toggles_block = content.split("self._refresh_toggles = (")[1].split(")")[0]
+            if "MqttEnabled" not in toggles_block:
+                anchor3 = '      ("AdbEnabled", self._adb_toggle),'
+                if anchor3 in content:
+                    content = content.replace(anchor3, anchor3 + '\n      ("MqttEnabled", self._mqtt_toggle),')
+                    dirty = True
+        except IndexError:
+            pass
+            
+        if dirty:
+            with open(developer_ui_path, 'w') as f:
+                f.write(content)
+            print("Injected UI MQTT settings into developer.py")
+
     print("MQTT injection complete.")
 
 if __name__ == '__main__':

@@ -1,0 +1,39 @@
+name: Sync Upstream OpenPilot
+
+on:
+  schedule:
+    # Run automatically every day at 3:00 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch: # Allows you to click "Run workflow" manually in the GitHub Actions UI
+
+jobs:
+  sync_with_upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout OpenRivian Repository
+        uses: actions/checkout@v4
+        with:
+          ref: cleaner-script-final # The branch to sync
+          fetch-depth: 0 # Fetch all history for merging
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Git User
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add Comma Upstream Remote
+        run: |
+          git remote add upstream https://github.com/commaai/openpilot.git
+          git fetch upstream
+
+      - name: Merge Upstream Changes
+        run: |
+          # We are merging from upstream/release3. 
+          # To track the bleeding edge instead, change 'release3' to 'master'
+          git merge upstream/release3 -m "Auto-sync with commaai upstream" || echo "Merge conflict detected! Manual resolution required."
+
+      - name: Push to OpenRivian
+        run: |
+          # If the merge was successful, push the synced code back to your branch
+          git push origin cleaner-script-final

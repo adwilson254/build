@@ -161,6 +161,7 @@ procs = [
   PythonProcess("uploader", "system.loggerd.uploader", uploader_ready),
   PythonProcess("statsd", "system.statsd", always_run),
   PythonProcess("feedbackd", "selfdrive.ui.feedback.feedbackd", only_onroad),
+  PythonProcess("scorerd", "selfdrive.rivian.scorerd", only_onroad),
 
     PythonProcess("mqttd", "selfdrive.rivian.mqttd", mqtt_enabled),
 

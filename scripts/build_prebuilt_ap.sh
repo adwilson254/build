@@ -8,6 +8,15 @@ echo "=========================================="
 echo "🚀 Building OpenRivian Prebuilt 'ap' Branch"
 echo "=========================================="
 
+# 0. Set up isolated Linux virtual environment
+# We do this so we don't accidentally execute or overwrite the Mac's .venv
+export UV_PROJECT_ENVIRONMENT="/home/batman/venv"
+export VIRTUAL_ENV=$UV_PROJECT_ENVIRONMENT
+export PATH="$VIRTUAL_ENV/bin:$PATH"
+
+echo "[0/4] Syncing Linux dependencies..."
+uv sync
+
 # 1. Compile the code using all available cores
 echo "[1/4] Compiling OpenPilot services (this may take a few minutes)..."
 scons -j$(nproc) --minimal

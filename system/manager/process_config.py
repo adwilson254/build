@@ -103,7 +103,19 @@ def or_(*fns):
 def and_(*fns):
   return lambda *args: operator.and_(*(fn(*args) for fn in fns))
 
+
+
+def mqtt_enabled(started: bool, params: Params, CP: car.CarParams) -> bool:
+  return params.get_bool("MqttEnabled")
+
+
+def web_ui_enabled(CP: car.CarParams, sm: messaging.SubMaster, pm: messaging.PubMaster) -> bool:
+  # The Web UI runs constantly unless explicitly disabled
+  return True
+
 procs = [
+  PythonProcess("webd", "selfdrive.web_ui.webd", web_ui_enabled),
+
   DaemonProcess("manage_athenad", "system.athena.manage_athenad", "AthenadPid"),
 
   NativeProcess("loggerd", "system/loggerd", ["./loggerd"], logging),
@@ -149,6 +161,8 @@ procs = [
   PythonProcess("uploader", "system.loggerd.uploader", uploader_ready),
   PythonProcess("statsd", "system.statsd", always_run),
   PythonProcess("feedbackd", "selfdrive.ui.feedback.feedbackd", only_onroad),
+
+    PythonProcess("mqttd", "selfdrive.rivian.mqttd", mqtt_enabled),
 
   # debug procs
   NativeProcess("bridge", "cereal/messaging", ["./bridge"], notcar),

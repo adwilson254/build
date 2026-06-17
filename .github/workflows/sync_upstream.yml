@@ -24,11 +24,7 @@ jobs:
 
       - name: Add Adventure Pilot Upstream Remote
         run: |
-          # FIXME: Replace with the actual Adventure Pilot GitHub repository URL if it differs from your origin!
-          # For example: git remote add upstream https://github.com/AdventurePilot/openpilot.git
-          # Assuming Adventure Pilot is the upstream, and we want to track their 'main' or 'ap' branch.
-          # Here we use a generic placeholder URL. Please update this line before enabling the action.
-          git remote add upstream https://github.com/YOUR_UPSTREAM_ORG/YOUR_ADVENTURE_PILOT_REPO.git
+          git remote add upstream https://github.com/AdventurePilotDev/AdventurePilot.git
           git fetch upstream
 
       - name: Merge Upstream Changes into main

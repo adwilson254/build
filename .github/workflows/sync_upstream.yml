@@ -26,7 +26,7 @@ concurrency:
 
 env:
   UPSTREAM_URL: https://github.com/AdventurePilotDev/AdventurePilot.git
-  UPSTREAM_BRANCH: main
+  UPSTREAM_BRANCH: ap-dev
 
 jobs:
   sync-inject-test:

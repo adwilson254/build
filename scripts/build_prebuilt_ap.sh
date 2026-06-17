@@ -14,16 +14,16 @@ export UV_PROJECT_ENVIRONMENT="/home/batman/venv"
 export VIRTUAL_ENV=$UV_PROJECT_ENVIRONMENT
 export PATH="$VIRTUAL_ENV/bin:$PATH"
 
-echo "[0/4] Syncing Linux dependencies..."
+echo "[0/5] Syncing Linux dependencies..."
 uv sync
 
 # 1. Compile the code using all available cores
-echo "[1/4] Compiling OpenPilot services (this may take a few minutes)..."
+echo "[1/5] Compiling OpenPilot services (this may take a few minutes)..."
 scons -j$(nproc) --minimal
 
 # 2. Prepare the clean output directory
 OUTPUT_DIR="prebuilt_ap"
-echo "[2/4] Cleaning previous builds..."
+echo "[2/5] Cleaning previous builds..."
 rm -rf $OUTPUT_DIR
 mkdir -p $OUTPUT_DIR
 
@@ -34,7 +34,7 @@ if ! command -v rsync &> /dev/null; then
 fi
 
 # 3. Strip massive source files and x86 binaries
-echo "[3/4] Stripping source files and packaging..."
+echo "[3/5] Stripping source files and packaging..."
 rsync -am \
   --exclude='.sconsign.dblite' \
   --exclude='*.a' \
@@ -52,6 +52,12 @@ rsync -am \
   --exclude='**/SConstruct' \
   --exclude='**/SConscript' \
   --exclude='**/.venv/' \
+  --exclude='**/node_modules/' \
+  --exclude='**/test/' \
+  --exclude='**/tests/' \
+  --exclude='tinygrad_repo/docs/' \
+  --exclude='tinygrad_repo/examples/' \
+  --exclude='docs/' \
   --exclude='selfdrive/modeld/models/driving_vision.onnx' \
   --exclude='selfdrive/modeld/models/driving_policy.onnx' \
   --exclude='third_party/*x86*' \
@@ -62,13 +68,27 @@ rsync -am \
   --delete-excluded \
   ./ $OUTPUT_DIR/ || true
 
-# 4. Prepare Git Repository for Push
-echo "[4/4] Preparing Git repository in $OUTPUT_DIR..."
+# 4. Fix git metadata files so all files get committed properly
+echo "[4/5] Fixing git metadata for prebuilt..."
+
+# Remove .pkl ignore rules from .gitignore so model files get committed
+sed -i '/^\*\.pkl/d' $OUTPUT_DIR/.gitignore
+
+# Strip LFS filters from .gitattributes so files are committed as plain objects
+sed -i '/filter=lfs/d' $OUTPUT_DIR/.gitattributes
+
+# Remove LFS config files (point to sunnypilot's GitLab, not ours)
+rm -f $OUTPUT_DIR/.lfsconfig $OUTPUT_DIR/.lfsconfig-comma
+
+# 5. Prepare Git Repository for Push
+echo "[5/5] Preparing Git repository in $OUTPUT_DIR..."
 cd $OUTPUT_DIR
+export GIT_LFS_SKIP_SMUDGE=1
 git init
 git checkout -b ap
 git config user.email "bot@openrivian.com"
 git config user.name "OpenRivian Bot"
+git lfs uninstall 2>/dev/null || true
 touch prebuilt
 git add .
 git commit -m "Auto-compiled prebuilt ap branch"

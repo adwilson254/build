@@ -27,6 +27,12 @@ echo "[2/4] Cleaning previous builds..."
 rm -rf $OUTPUT_DIR
 mkdir -p $OUTPUT_DIR
 
+# 2.5 Ensure rsync is installed (openpilot-dev docker container doesn't have it by default)
+if ! command -v rsync &> /dev/null; then
+    echo "rsync not found. Installing it now..."
+    sudo apt-get update && sudo apt-get install -y rsync || (apt-get update && apt-get install -y rsync)
+fi
+
 # 3. Strip massive source files and x86 binaries
 echo "[3/4] Stripping source files and packaging..."
 rsync -am \

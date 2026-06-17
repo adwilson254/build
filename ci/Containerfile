@@ -20,16 +20,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && locale-gen \
     && rm -rf /var/lib/apt/lists/*
 
-# Non-root build user matching upstream conventions.
-ARG USER=batman
-RUN useradd -m -s /bin/bash "$USER" && \
-    echo "$USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
-    git config --system --add safe.directory '*'
-USER $USER
+# Run as root. Under rootless podman the host user maps to container root, so
+# the bind-mounted /work is writable (uv venv, scons build artifacts).
+RUN git config --system --add safe.directory '*'
 
 # Install uv (the dependency manager openpilot uses).
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/home/$USER/.local/bin:$PATH"
+ENV PATH="/root/.local/bin:$PATH"
 
 WORKDIR /work
 ENV PYTHONPATH=/work

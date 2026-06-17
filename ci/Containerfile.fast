@@ -1,0 +1,22 @@
+# Fast pure-Python test image for the OpenRivian merge gate.
+# Intentionally minimal: no compiled openpilot artifacts required.
+FROM docker.io/library/python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+# Test-only dependencies. The fast tests mock cereal/aiohttp/params, so we only
+# need pytest + a couple of helpers. paho-mqtt is the one real runtime dep that
+# the injected mqtt code imports at module load.
+RUN pip install --no-cache-dir \
+      pytest==8.3.4 \
+      pytest-xdist==3.6.1 \
+      paho-mqtt==2.1.0 \
+      requests==2.32.3
+
+WORKDIR /work
+
+# Source is bind-mounted at runtime by run-fast.sh so iteration is instant.
+ENV PYTHONPATH=/work
+ENTRYPOINT ["/bin/bash"]

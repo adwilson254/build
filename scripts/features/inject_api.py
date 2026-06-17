@@ -1,10 +1,23 @@
 #!/usr/bin/env python3
 import os
 import shutil
+import sys
 
-def inject_api():
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from inject_common import add_param_keys  # noqa: E402
+
+
+def inject_api(base_dir=None):
+    if base_dir is None:
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     src_dir = os.path.join(base_dir, 'scripts', 'features', 'src', 'rivian')
+
+    # Register the param keys this feature uses.
+    add_param_keys(base_dir, [
+        ("RivianApiEnabled", '{"RivianApiEnabled", {PERSISTENT | BACKUP, BOOL, "0"}},'),
+        ("RivianApiToken", '{"RivianApiToken", {PERSISTENT | DONT_LOG | BACKUP, STRING}},'),
+        ("RivianApiStatus", '{"RivianApiStatus", {CLEAR_ON_MANAGER_START, STRING, "Unconfigured"}},'),
+    ])
     dest_dir = os.path.join(base_dir, 'selfdrive', 'rivian')
 
     if not os.path.exists(dest_dir):
@@ -53,15 +66,15 @@ def inject_api():
         except IndexError:
             pass
 
-        try:
-            toggles_block = content.split("self._refresh_toggles = (")[1].split(")")[0]
-            if "RivianApiEnabled" not in toggles_block:
-                anchor3 = '      ("AdbEnabled", self._adb_toggle),'
-                if anchor3 in content:
-                    content = content.replace(anchor3, anchor3 + '\n      ("RivianApiEnabled", self._rivian_toggle),')
-                    dirty = True
-        except IndexError:
-            pass
+        # NOTE: tuple entries contain ')', so we must check the exact entry
+        # against the full content rather than a ')'-split block (which would
+        # only ever see the first entry and re-inject on every run).
+        rivian_refresh_entry = '("RivianApiEnabled", self._rivian_toggle)'
+        if "self._refresh_toggles = (" in content and rivian_refresh_entry not in content:
+            anchor3 = '      ("AdbEnabled", self._adb_toggle),'
+            if anchor3 in content:
+                content = content.replace(anchor3, anchor3 + '\n      ("RivianApiEnabled", self._rivian_toggle),')
+                dirty = True
 
         if "RivianApiStatus" not in content:
             refresh_code = """

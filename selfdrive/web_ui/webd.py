@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 import os
-import json
-import asyncio
 from aiohttp import web
 from openpilot.common.params import Params
 
@@ -38,7 +36,7 @@ class WebServer:
         
         try:
             val_str = val.decode('utf-8')
-        except:
+        except Exception:
             val_str = str(val)
             
         return web.json_response({'key': key, 'value': val_str})

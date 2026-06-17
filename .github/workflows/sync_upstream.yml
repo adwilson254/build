@@ -1,19 +1,19 @@
-name: Sync Upstream OpenPilot
+name: Sync Upstream & Deploy
 
 on:
   schedule:
     # Run automatically every day at 3:00 AM UTC
     - cron: '0 3 * * *'
-  workflow_dispatch: # Allows you to click "Run workflow" manually in the GitHub Actions UI
+  workflow_dispatch: # Allows manual trigger from GitHub Actions UI
 
 jobs:
-  sync_with_upstream:
+  sync_and_deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout OpenRivian Repository
+      - name: Checkout OpenRivian Repository (main branch)
         uses: actions/checkout@v4
         with:
-          ref: main # The branch to sync
+          ref: main
           fetch-depth: 0 # Fetch all history for merging
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -22,18 +22,48 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Add Comma Upstream Remote
+      - name: Add Adventure Pilot Upstream Remote
         run: |
-          git remote add upstream https://github.com/commaai/openpilot.git
+          # FIXME: Replace with the actual Adventure Pilot GitHub repository URL if it differs from your origin!
+          # For example: git remote add upstream https://github.com/AdventurePilot/openpilot.git
+          # Assuming Adventure Pilot is the upstream, and we want to track their 'main' or 'ap' branch.
+          # Here we use a generic placeholder URL. Please update this line before enabling the action.
+          git remote add upstream https://github.com/YOUR_UPSTREAM_ORG/YOUR_ADVENTURE_PILOT_REPO.git
           git fetch upstream
 
-      - name: Merge Upstream Changes
+      - name: Merge Upstream Changes into main
         run: |
-          # We are merging from upstream/release3. 
-          # To track the bleeding edge instead, change 'release3' to 'master'
-          git merge upstream/release3 -m "Auto-sync with commaai upstream" || echo "Merge conflict detected! Manual resolution required."
+          # Update 'upstream/main' to the specific Adventure Pilot branch you are tracking (e.g., upstream/ap or upstream/master)
+          git merge upstream/main -m "Auto-sync with Adventure Pilot upstream" || echo "Merge conflict detected! Manual resolution required."
 
-      - name: Push to OpenRivian
+      - name: Re-Inject Custom Rivian Features
         run: |
-          # If the merge was successful, push the synced code back to your branch
+          echo "Running injection scripts to re-apply custom Rivian patches..."
+          chmod +x ./scripts/features/inject_api.py
+          chmod +x ./scripts/features/inject_mqtt.py
+          chmod +x ./scripts/features/inject_web.py
+          
+          ./scripts/features/inject_api.py
+          ./scripts/features/inject_mqtt.py
+          ./scripts/features/inject_web.py
+
+          echo "Committing injected changes..."
+          git add .
+          git commit -m "build: Auto-inject custom Rivian API, MQTT, and Web UI features" || echo "No injection changes to commit"
+
+      - name: Test Build in OpenPilot Docker
+        run: |
+          echo "Testing build in commaai/openpilot-base docker container..."
+          docker pull ghcr.io/commaai/openpilot-base:latest
+          docker run --rm -v ${{ github.workspace }}:/tmp/openpilot -w /tmp/openpilot ghcr.io/commaai/openpilot-base:latest scons -j$(nproc)
+
+      - name: Push Updates to main
+        run: |
           git push origin main
+
+      - name: Promote to ap Branch (Deployment)
+        run: |
+          echo "Build successful! Promoting code to the 'ap' branch..."
+          git checkout ap
+          git merge main
+          git push origin ap

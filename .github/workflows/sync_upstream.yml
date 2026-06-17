@@ -33,6 +33,9 @@ concurrency:
   group: sync-upstream
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
 env:
   UPSTREAM_URL: https://github.com/AdventurePilotDev/AdventurePilot.git
   UPSTREAM_BRANCH: ap-dev

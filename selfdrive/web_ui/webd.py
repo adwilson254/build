@@ -20,7 +20,6 @@ class WebServer:
         self.app.router.add_get('/api/params/{key}', self.get_param)
         self.app.router.add_post('/api/params/{key}', self.set_param)
         self.app.router.add_get('/api/telemetry', self.get_telemetry)
-        self.app.router.add_post('/api/webrtc', self.proxy_webrtc)
 
         # Static file serving for the React App
         if os.path.exists(FRONTEND_DIST):
@@ -58,7 +57,8 @@ class WebServer:
         return web.json_response({'success': True})
 
     async def get_telemetry(self, request):
-        # We can poll telemetry here, but WebRTC data channels are preferred.
+        # Stub for telemetry. We will wire this up to cereal later.
+        # For now, return mock data.
         mock_data = {
             "speed": 65.2,
             "score": 94,
@@ -66,17 +66,6 @@ class WebServer:
             "model_path": []
         }
         return web.json_response(mock_data)
-
-    async def proxy_webrtc(self, request):
-        import aiohttp
-        try:
-            data = await request.json()
-            async with aiohttp.ClientSession() as session:
-                async with session.post('http://127.0.0.1:5001/stream', json=data) as resp:
-                    resp_data = await resp.json()
-                    return web.json_response(resp_data, status=resp.status)
-        except Exception as e:
-            return web.json_response({"error": str(e)}, status=500)
 
     async def serve_index(self, request):
         index_path = os.path.join(FRONTEND_DIST, 'index.html')

@@ -2,7 +2,7 @@ Import('env', 'arch', 'messaging', 'common', 'visionipc')
 
 libs = [common, messaging, visionipc,
         'avformat', 'avcodec', 'swresample', 'avutil', 'x264',
-        'pthread', 'z', 'm', 'zstd', 'va', 'va-drm']
+        'pthread', 'z', 'm', 'zstd', 'va', 'va-drm', 'drm']
 
 src = ['logger.cc', 'zstd_writer.cc', 'video_writer.cc', 'encoder/encoder.cc', 'encoder/v4l_encoder.cc', 'encoder/jpeg_encoder.cc']
 if arch != "larch64":

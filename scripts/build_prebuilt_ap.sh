@@ -69,6 +69,7 @@ git init
 git checkout -b ap
 git config user.email "bot@openrivian.com"
 git config user.name "OpenRivian Bot"
+touch prebuilt
 git add .
 git commit -m "Auto-compiled prebuilt ap branch"
 

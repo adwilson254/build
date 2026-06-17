@@ -3,7 +3,7 @@ from opendbc.car.interfaces import CarInterfaceBase
 from opendbc.car.rivian.carcontroller import CarController
 from opendbc.car.rivian.carstate import CarState
 from opendbc.car.rivian.radar_interface import RadarInterface
-from opendbc.car.rivian.values import RivianSafetyFlags
+from opendbc.car.rivian.values import RivianFlags, RivianSafetyFlags
 from opendbc.sunnypilot.car.rivian.values import RivianFlagsSP
 
 
@@ -18,11 +18,14 @@ class CarInterface(CarInterfaceBase):
 
     ret.safetyConfigs = [get_safety_config(structs.CarParams.SafetyModel.rivian)]
 
+    # GEN2 (2025+) doesn't have SCCM_WheelTouch on the bus
+    if 0x321 not in fingerprint[0]:
+      ret.flags |= RivianFlags.GEN2.value
+
     ret.steerActuatorDelay = 0.15
     ret.steerLimitTimer = 0.4
     CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
-    ret.steerAtStandstill = True
     ret.steerControlType = structs.CarParams.SteerControlType.torque
     ret.radarUnavailable = True
 
@@ -32,9 +35,14 @@ class CarInterface(CarInterfaceBase):
       ret.openpilotLongitudinalControl = True
       ret.safetyConfigs[0].safetyParam |= RivianSafetyFlags.LONG_CONTROL.value
 
-    ret.longitudinalActuatorDelay = 0.35
+    # Measured command->aEgo lag ~0.25s (route 00000028, xcorr); was 0.1 = under-modeled, so the
+    # planner under-anticipates the VDM. 0.2 tightens anticipation (smoother) while staying well under
+    # xnor's conservative 0.5 to keep AP's responsive feel. Fall back to 0.15 if it feels laggy on lead-brake.
+    ret.longitudinalActuatorDelay = 0.2
     ret.vEgoStopping = 0.25
-    ret.stopAccel = 0
+    ret.stopAccel = -0.2
+    ret.longitudinalTuning.kiBP = [0.]
+    ret.longitudinalTuning.kiV = [0.2]
 
     return ret
 

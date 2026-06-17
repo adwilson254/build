@@ -22,13 +22,12 @@ class ModelYear(StrEnum):
   P_2023 = "P"
   R_2024 = "R"
   S_2025 = "S"
+  T_2026 = "T"
 
 
 @dataclass
 class RivianCarDocs(CarDocs):
   package: str = "All"
-  car_parts: CarParts = field(default_factory=CarParts.common([CarHarness.rivian]))
-  setup_video: str = "https://youtu.be/uaISd1j7Z4U"
 
 
 @dataclass
@@ -40,17 +39,26 @@ class RivianPlatformConfig(PlatformConfig):
   years: set[ModelYear] = field(default_factory=set)
 
 
+class RivianFlags(IntFlag):
+  GEN2 = 1
+
+
+class RivianSafetyFlags(IntFlag):
+  LONG_CONTROL = 1
+
+
 class CAR(Platforms):
-  RIVIAN_R1_GEN1 = RivianPlatformConfig(
-    # TODO: verify this
+  RIVIAN_R1 = RivianPlatformConfig(
     [
-      RivianCarDocs("Rivian R1S 2022-24"),
-      RivianCarDocs("Rivian R1T 2022-24"),
+      RivianCarDocs("Rivian R1S 2022-24", setup_video="https://youtu.be/uaISd1j7Z4U", car_parts=CarParts.common([CarHarness.rivian_a])),
+      RivianCarDocs("Rivian R1S 2025", car_parts=CarParts.common([CarHarness.rivian_b])),
+      RivianCarDocs("Rivian R1T 2022-24", setup_video="https://youtu.be/uaISd1j7Z4U", car_parts=CarParts.common([CarHarness.rivian_a])),
+      RivianCarDocs("Rivian R1T 2025", car_parts=CarParts.common([CarHarness.rivian_b])),
     ],
     CarSpecs(mass=3206., wheelbase=3.08, steerRatio=15.2),
     wmis={WMI.RIVIAN_TRUCK, WMI.RIVIAN_MPV},
     lines={ModelLine.R1T, ModelLine.R1S},
-    years={ModelYear.N_2022, ModelYear.P_2023, ModelYear.R_2024},
+    years={ModelYear.N_2022, ModelYear.P_2023, ModelYear.R_2024, ModelYear.S_2025},
   )
 
 
@@ -112,12 +120,17 @@ class CarControllerParams:
   # and lateral acceleration falls linearly as speed decreases from 38 mph to 20 mph. These values are set
   # conservatively to reach a maximum of 3.0 m/s^2 turning left at 80 mph
 
-  # These refer to turning left (symmetric torque counts; ACM_lkaStrToqReq raw − 1024):
-  # 300 above 17 m/s; below 9 m/s ramp to 400
+  # These refer to turning left:
+  # 250 is ~2.8 m/s^2 above 17 m/s, then linearly ramps to ~1.6 m/s^2 from 17 m/s to 9 m/s
   # TODO: it is theorized older models have different steering racks and achieve down to half the
   #  lateral acceleration referenced here at all speeds. detect this and ship a torque increase for those models
-  STEER_MAX = 300
-  STEER_MAX_LOOKUP = [9, 17], [400, 300]
+  STEER_MAX = 385  # peak of the lookup below
+  # 4-point lookup keeps the highway cap at 275 (unchanged from old [385,275]) but
+  # holds slightly elevated torque through the 13-25 m/s band. Earlier
+  # [9,13,25,27]->[481,415,305,275] shape was too aggressive (jerky low speed,
+  # oversteer at mid speed); this halves the mid-speed bump and reverts low speed
+  # to original. Knee moved 17 -> 27 m/s so modest help extends through ~55 mph.
+  STEER_MAX_LOOKUP = [9, 13, 25, 27], [385, 350, 295, 275]
   STEER_STEP = 1
   STEER_DELTA_UP = 3  # torque increase per refresh
   STEER_DELTA_DOWN = 5  # torque decrease per refresh
@@ -130,10 +143,6 @@ class CarControllerParams:
 
   def __init__(self, CP):
     pass
-
-
-class RivianSafetyFlags(IntFlag):
-  LONG_CONTROL = 1
 
 
 DBC = CAR.create_dbc_map()

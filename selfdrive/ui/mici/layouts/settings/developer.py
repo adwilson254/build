@@ -2,6 +2,7 @@ from openpilot.common.time_helpers import system_time_valid
 from openpilot.system.ui.widgets.scroller import NavScroller
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton, BigToggle, BigParamControl, BigCircleParamControl
 from openpilot.selfdrive.ui.mici.widgets.dialog import BigDialog, BigInputDialog
+from openpilot.selfdrive.ui.mici.layouts.settings.branch_selector import BranchSelectorMici
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.selfdrive.ui.layouts.settings.common import restart_needed_callback
 from openpilot.selfdrive.ui.ui_state import ui_state
@@ -45,6 +46,11 @@ class DeveloperLayoutMici(NavScroller):
     self._ssh_keys_btn = BigButton("SSH keys", "Not set" if not github_username else github_username, icon=txt_ssh)
     self._ssh_keys_btn.set_click_callback(ssh_keys_callback)
 
+    # Branch switcher. The mici UI has no Software settings page, so the Target Branch selector
+    # (present in the big tici/tizi UI) lives here as a pushed sub-page.
+    self._branch_btn = BigButton("target branch", ui_state.params.get("UpdaterTargetBranch") or "", scroll=True)
+    self._branch_btn.set_click_callback(self._open_branch_selector)
+
     # adb, ssh, ssh keys, debug mode, joystick debug mode, longitudinal maneuver mode, ip address
     # ******** Main Scroller ********
     self._adb_toggle = BigCircleParamControl(gui_app.texture("icons_mici/adb_short.png", 82, 82), "AdbEnabled", icon_offset=(0, 12))
@@ -55,6 +61,9 @@ class DeveloperLayoutMici(NavScroller):
     self._long_maneuver_toggle = BigToggle("longitudinal maneuver mode",
                                            initial_state=ui_state.params.get_bool("LongitudinalManeuverMode"),
                                            toggle_callback=self._on_long_maneuver_mode)
+    self._lat_maneuver_toggle = BigToggle("lateral maneuver mode",
+                                          initial_state=ui_state.params.get_bool("LateralManeuverMode"),
+                                          toggle_callback=self._on_lat_maneuver_mode)
     self._alpha_long_toggle = BigToggle("alpha longitudinal",
                                         initial_state=ui_state.params.get_bool("AlphaLongitudinalEnabled"),
                                         toggle_callback=self._on_alpha_long_enabled)
@@ -66,8 +75,10 @@ class DeveloperLayoutMici(NavScroller):
       self._adb_toggle,
       self._ssh_toggle,
       self._ssh_keys_btn,
+      self._branch_btn,
       self._joystick_toggle,
       self._long_maneuver_toggle,
+      self._lat_maneuver_toggle,
       self._alpha_long_toggle,
       self._debug_mode_toggle,
     ])
@@ -78,12 +89,13 @@ class DeveloperLayoutMici(NavScroller):
       ("SshEnabled", self._ssh_toggle),
       ("JoystickDebugMode", self._joystick_toggle),
       ("LongitudinalManeuverMode", self._long_maneuver_toggle),
+      ("LateralManeuverMode", self._lat_maneuver_toggle),
       ("AlphaLongitudinalEnabled", self._alpha_long_toggle),
       ("ShowDebugInfo", self._debug_mode_toggle),
     )
     onroad_blocked_toggles = (self._adb_toggle, self._joystick_toggle)
-    release_blocked_toggles = (self._joystick_toggle, self._long_maneuver_toggle, self._alpha_long_toggle)
-    engaged_blocked_toggles = (self._long_maneuver_toggle, self._alpha_long_toggle)
+    release_blocked_toggles = (self._joystick_toggle, self._long_maneuver_toggle, self._lat_maneuver_toggle, self._alpha_long_toggle)
+    engaged_blocked_toggles = (self._long_maneuver_toggle, self._lat_maneuver_toggle, self._alpha_long_toggle)
 
     # Hide non-release toggles on release builds
     for item in release_blocked_toggles:
@@ -108,6 +120,12 @@ class DeveloperLayoutMici(NavScroller):
     super()._update_state()
     self._ssh_fetcher.update()
 
+    # Mirror the current target branch every frame so the row reflects a selection made in the
+    # branch selector sub-page (which only writes the param) once we pop back here.
+    target = ui_state.params.get("UpdaterTargetBranch") or ""
+    if self._branch_btn.get_value() != target:
+      self._branch_btn.set_value(target)
+
   def show_event(self):
     super().show_event()
     self._update_toggles()
@@ -129,23 +147,43 @@ class DeveloperLayoutMici(NavScroller):
       if not long_man_enabled:
         self._long_maneuver_toggle.set_checked(False)
         ui_state.params.put_bool("LongitudinalManeuverMode", False)
+
+      lat_man_enabled = ui_state.is_offroad()
+      self._lat_maneuver_toggle.set_enabled(lat_man_enabled)
     else:
       self._long_maneuver_toggle.set_enabled(False)
+      self._lat_maneuver_toggle.set_enabled(False)
       self._alpha_long_toggle.set_visible(False)
 
     # Refresh toggles from params to mirror external changes
     for key, item in self._refresh_toggles:
       item.set_checked(ui_state.params.get_bool(key))
 
+  def _open_branch_selector(self):
+    gui_app.push_widget(BranchSelectorMici(back_callback=gui_app.pop_widget))
+
   def _on_joystick_debug_mode(self, state: bool):
     ui_state.params.put_bool("JoystickDebugMode", state)
     ui_state.params.put_bool("LongitudinalManeuverMode", False)
     self._long_maneuver_toggle.set_checked(False)
+    ui_state.params.put_bool("LateralManeuverMode", False)
+    self._lat_maneuver_toggle.set_checked(False)
 
   def _on_long_maneuver_mode(self, state: bool):
     ui_state.params.put_bool("LongitudinalManeuverMode", state)
     ui_state.params.put_bool("JoystickDebugMode", False)
     self._joystick_toggle.set_checked(False)
+    ui_state.params.put_bool("LateralManeuverMode", False)
+    self._lat_maneuver_toggle.set_checked(False)
+    restart_needed_callback(state)
+
+  def _on_lat_maneuver_mode(self, state: bool):
+    ui_state.params.put_bool("LateralManeuverMode", state)
+    ui_state.params.put_bool("ExperimentalMode", False)
+    ui_state.params.put_bool("JoystickDebugMode", False)
+    self._joystick_toggle.set_checked(False)
+    ui_state.params.put_bool("LongitudinalManeuverMode", False)
+    self._long_maneuver_toggle.set_checked(False)
     restart_needed_callback(state)
 
   def _on_alpha_long_enabled(self, state: bool):

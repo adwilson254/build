@@ -93,3 +93,4 @@ SKILL.md
 !.idea/customTargets.xml
 !.idea/tools/*
 !.run/*
+prebuilt_ap/

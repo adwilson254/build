@@ -2,15 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer utilities {
-  .glass-panel {
-    @apply bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl;
-  }
-}
-
 body {
   margin: 0;
-  background-color: #121212;
-  color: white;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  overflow-x: hidden;
+  overflow-y: auto;
 }

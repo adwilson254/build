@@ -1,252 +1,142 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import BottomDock from './components/BottomDock';
 import WhitePanel from './components/WhitePanel';
-import { ToggleRight, ToggleLeft, RefreshCw, CarFront, Zap, ImageIcon, VideoOff } from 'lucide-react';
-
-const BackgroundLayer = ({ mode, stream, telemetry }) => {
-  if (mode === 'map') {
-    return (
-      <div className="fixed inset-0 z-0 bg-[#121212] overflow-hidden">
-        {/* Real Leaflet Map placeholder (currently OpenStreetMap embed, will be replaced with real GPS mapping if telemetry.gps exists) */}
-        {telemetry?.gps ? (
-          <iframe 
-            width="100%" height="100%" frameBorder="0" scrolling="no" marginHeight="0" marginWidth="0" 
-            src={`https://www.openstreetmap.org/export/embed.html?bbox=${telemetry.gps[1]-0.05}%2C${telemetry.gps[0]-0.05}%2C${telemetry.gps[1]+0.05}%2C${telemetry.gps[0]+0.05}&layer=mapnik&marker=${telemetry.gps[0]}%2C${telemetry.gps[1]}`}
-            className="w-full h-full filter invert hue-rotate-180 opacity-80 pointer-events-none scale-110">
-          </iframe>
-        ) : (
-          <iframe 
-            width="100%" height="100%" frameBorder="0" scrolling="no" marginHeight="0" marginWidth="0" 
-            src="https://www.openstreetmap.org/export/embed.html?bbox=-122.45%2C37.73%2C-122.35%2C37.81&layer=mapnik" 
-            className="w-full h-full filter invert hue-rotate-180 opacity-80 pointer-events-none scale-110">
-          </iframe>
-        )}
-      </div>
-    );
-  }
-  if (mode === 'camera') {
-    return (
-      <div className="fixed inset-0 z-0 bg-black flex items-center justify-center">
-        {stream ? (
-          <video autoPlay playsInline muted className="w-full h-full object-cover opacity-80" ref={video => { if (video) video.srcObject = stream; }}></video>
-        ) : (
-          <div className="text-gray-500 flex flex-col items-center">
-            <VideoOff size={48} className="mb-4 opacity-50" />
-            <span className="animate-pulse tracking-widest text-sm uppercase">Awaiting WebRTC Stream</span>
-          </div>
-        )}
-      </div>
-    );
-  }
-  if (mode === 'car3d') {
-    return (
-      <div className="fixed inset-0 z-0 bg-gray-200">
-        <iframe src='https://my.spline.design/conceptcar-e08922cfb826f7c9e12bf2ed6bba00d6/' frameBorder='0' width='100%' height='100%' className="pointer-events-none scale-125"></iframe>
-      </div>
-    );
-  }
-  if (mode === 'path') {
-    return (
-      <div className="fixed inset-0 z-0 bg-[#0f172a] flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0f172a] via-transparent to-[#0f172a] z-10 pointer-events-none"></div>
-        {/* Fake 3D Road using CSS Transforms (Will be replaced with Canvas modelV2 drawing) */}
-        <div className="absolute bottom-0 w-full h-[60vh] perspective-[1000px] flex justify-center">
-           <div className="w-[300px] h-[150%] border-l-[12px] border-r-[12px] border-cyan-400 opacity-90 translate-y-20 drop-shadow-[0_0_15px_rgba(34,211,238,0.8)]" style={{ transform: 'rotateX(75deg)'}}>
-              <div className="w-full h-full bg-cyan-900/20"></div>
-           </div>
-           {/* Fake lead car block */}
-           <div className="absolute top-[20%] w-32 h-16 bg-blue-500 rounded-xl blur-sm opacity-80"></div>
-        </div>
-        <div className="absolute top-24 font-mono text-cyan-400 opacity-80 text-3xl font-bold tracking-widest text-center">
-          <div>{telemetry.is_engaged ? 'ENGAGED' : 'DISENGAGED'}</div>
-          <div className="text-6xl mt-2 text-white">{telemetry.speed.toFixed(0)} <span className="text-2xl text-gray-400">MPH</span></div>
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
+import { ToggleRight, ToggleLeft, RefreshCw, CarFront, Zap, ImageIcon, VideoOff, Map as MapIcon, Camera, Maximize } from 'lucide-react';
 
 export default function App() {
-  const [telemetry, setTelemetry] = useState({ speed: 0, battery: 100, is_engaged: false, gps: null, path: null });
+  const [telemetry, setTelemetry] = useState({ speed: 0, battery: 100, is_engaged: false });
   const [apiConnected, setApiConnected] = useState(true);
-  const [stream, setStream] = useState(null);
-  
-  // Array of background modes
-  const bgModes = ['camera', 'map', 'car3d', 'path'];
-  const [bgIndex, setBgIndex] = useState(0);
+  const [bgMode, setBgMode] = useState('render'); // 'render', 'map', 'camera'
 
-  // WebRTC Local Signaling Connection
+  // In the future, this will fetch from webd.py
   useEffect(() => {
-    let pc;
-    const connectWebRTC = async () => {
-      try {
-        pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-        pc.addTransceiver('video', { direction: 'recvonly' });
-
-        pc.ontrack = (event) => {
-          if (event.track.kind === 'video') setStream(event.streams[0]);
-        };
-
-        pc.ondatachannel = (event) => {
-          event.channel.onmessage = (e) => {
-            try {
-              const msg = JSON.parse(e.data);
-              if (msg.type === 'carState') {
-                setTelemetry(prev => ({ 
-                  ...prev, 
-                  speed: msg.data.vEgo * 2.23694, // Convert m/s to mph
-                  is_engaged: msg.data.cruiseState?.enabled || false
-                }));
-              } else if (msg.type === 'liveLocationKalman') {
-                setTelemetry(prev => ({ ...prev, gps: msg.data.positionGeodetic?.value }));
-              }
-            } catch (err) {}
-          };
-        };
-
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-
-        // Proxy SDP Offer through our Python daemon to the local webrtcd daemon
-        const response = await fetch('/api/webrtc', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sdp: pc.localDescription.sdp,
-            initCamera: "roadCameraState",
-            bridge_services_in: [],
-            bridge_services_out: ["carState", "liveLocationKalman", "modelV2"]
-          })
-        });
-
-        if (response.ok) {
-          const answer = await response.json();
-          await pc.setRemoteDescription(new RTCSessionDescription({ type: answer.type, sdp: answer.sdp }));
-        } else {
-          console.warn("WebRTC Signaling proxy failed. Is openpilot running?");
-        }
-      } catch (err) {
-        console.error("WebRTC Error:", err);
-      }
-    };
-    
-    connectWebRTC();
-    return () => { if (pc) pc.close(); };
+    const interval = setInterval(() => {
+      setTelemetry(prev => ({ ...prev, speed: Math.floor(Math.random() * 80) }));
+    }, 1000);
+    return () => clearInterval(interval);
   }, []);
 
-  const cycleBackground = () => setBgIndex((prev) => (prev + 1) % bgModes.length);
-
   return (
-    <div className="min-h-screen relative overflow-x-hidden font-sans pb-24">
+    <div className="min-h-screen relative overflow-x-hidden font-sans pb-24 transition-colors duration-500">
       
-      {/* Live Interactive Background */}
-      <BackgroundLayer mode={bgModes[bgIndex]} stream={stream} telemetry={telemetry} />
-
-      {/* Floating Background Switcher */}
-      <button 
-        onClick={cycleBackground}
-        className="fixed top-6 right-6 z-50 bg-black/50 hover:bg-black/80 backdrop-blur-md text-white px-4 py-2 rounded-full font-bold text-sm shadow-xl border border-white/20 flex items-center gap-2 transition-all"
-      >
-        <ImageIcon size={18} />
-        {bgModes[bgIndex].toUpperCase()} (Click to Cycle)
-      </button>
-
-      {/* Main Content Area */}
-      <div className="relative z-10 p-6 pt-24 md:p-12 max-w-md md:max-w-sm flex flex-col gap-6">
-        
-        {/* Telemetry HUD */}
-        <div className="bg-black/40 backdrop-blur-lg rounded-2xl p-4 flex justify-between items-center text-white border border-white/10 shadow-2xl">
-          <div className="flex flex-col">
-            <span className="text-xs text-gray-400 tracking-wider">SPEED</span>
-            <span className="text-3xl font-bold font-mono">{telemetry.speed.toFixed(0)} <span className="text-sm font-sans text-gray-300">mph</span></span>
-          </div>
-          <div className="flex flex-col items-end">
-            <span className="text-xs text-gray-400 tracking-wider">STATUS</span>
-            <span className={`text-sm font-bold px-3 py-1 rounded-full mt-1 ${telemetry.is_engaged ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-400/50' : 'bg-gray-500/20 text-gray-400 border border-gray-500/50'}`}>
-              {telemetry.is_engaged ? 'ENGAGED' : 'DISENGAGED'}
-            </span>
-          </div>
+      {/* Dynamic Background */}
+      <div className={`fixed inset-0 z-0 transition-opacity duration-1000 ${bgMode === 'render' ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="absolute inset-0 bg-gradient-to-b from-gray-300 to-gray-400"></div>
+        <div className="absolute inset-0 flex flex-col items-center justify-center opacity-30">
+          <CarFront size={180} className="text-gray-600 mb-6 drop-shadow-xl" />
+          <h1 className="text-5xl font-bold text-gray-600 tracking-widest">OPEN RIVIAN</h1>
         </div>
+      </div>
 
+      <div className={`fixed inset-0 z-0 transition-opacity duration-1000 ${bgMode === 'map' ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="absolute inset-0 bg-[#e5e5e5]"></div>
+        <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
+        <div className="absolute inset-0 flex flex-col items-center justify-center opacity-50">
+           <MapIcon size={120} className="text-gray-500 mb-4" />
+           <h2 className="text-2xl font-bold text-gray-500">ABRP Map View</h2>
+        </div>
+      </div>
+
+      <div className={`fixed inset-0 z-0 transition-opacity duration-1000 ${bgMode === 'camera' ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="absolute inset-0 bg-black"></div>
+        <div className="absolute inset-0 flex flex-col items-center justify-center opacity-40">
+           <Camera size={120} className="text-white mb-4" />
+           <h2 className="text-2xl font-bold text-white">Live Camera Feed</h2>
+        </div>
+      </div>
+
+      {/* Background Cycler Controls */}
+      <div className="absolute top-6 right-6 z-20 flex gap-2 bg-white/40 backdrop-blur-md p-1.5 rounded-full shadow-sm border border-white/50">
+        <button 
+          onClick={() => setBgMode('render')}
+          className={`p-2.5 rounded-full transition-all ${bgMode === 'render' ? 'bg-white shadow-md text-rivian-cyan' : 'text-gray-600 hover:bg-white/50'}`}>
+          <CarFront size={20} />
+        </button>
+        <button 
+          onClick={() => setBgMode('map')}
+          className={`p-2.5 rounded-full transition-all ${bgMode === 'map' ? 'bg-white shadow-md text-rivian-cyan' : 'text-gray-600 hover:bg-white/50'}`}>
+          <MapIcon size={20} />
+        </button>
+        <button 
+          onClick={() => setBgMode('camera')}
+          className={`p-2.5 rounded-full transition-all ${bgMode === 'camera' ? 'bg-white shadow-md text-rivian-cyan' : 'text-gray-600 hover:bg-white/50'}`}>
+          <Camera size={20} />
+        </button>
+      </div>
+
+      {/* Main Content Area (Responsive Layout) */}
+      {/* On desktop (md), it's a fixed floating sidebar on the left. On mobile, it's vertically stacked below a spacer. */}
+      <div className="relative z-10 p-6 pt-32 md:pt-12 md:pl-12 w-full md:w-[400px] flex flex-col gap-6">
+        
         {/* Driving Models Card */}
         <WhitePanel title="Drive Modes">
           <div className="grid grid-cols-2 gap-3 mb-4">
-            <button className="bg-gray-800 text-white rounded-xl py-3 font-semibold shadow-md border-2 border-cyan-400 flex items-center justify-center gap-2">
+            <button className="bg-gray-800 text-white rounded-xl py-3 font-semibold shadow-md border-2 border-rivian-cyan flex items-center justify-center gap-2">
               <Zap size={18} /> Default
             </button>
             <button className="bg-gray-100 text-gray-500 rounded-xl py-3 font-semibold hover:bg-gray-200 transition-colors">
               Chill
             </button>
-            <button className="bg-gray-100 text-gray-500 rounded-xl py-3 font-semibold hover:bg-gray-200 transition-colors">
-              Aggress
-            </button>
-            <button className="bg-gray-100 text-gray-500 rounded-xl py-3 font-semibold hover:bg-gray-200 transition-colors">
-              Experi
+            <button className="bg-gray-100 text-gray-500 rounded-xl py-3 font-semibold hover:bg-gray-200 transition-colors col-span-2">
+              Experimental Route
             </button>
           </div>
-          <div className="bg-gray-100 rounded-xl p-4 flex justify-between items-center">
-            <span className="text-sm font-semibold text-gray-600">Model Auto-Update</span>
-            <ToggleRight size={28} className="text-cyan-500" />
+          
+          <div className="flex justify-between items-end border-t border-gray-200 pt-4 mt-2">
+            <div className="flex flex-col">
+              <span className="text-4xl font-light text-gray-800">{telemetry.speed}</span>
+              <span className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">MPH</span>
+            </div>
+            <div className="flex flex-col items-end">
+              <span className="text-2xl font-light text-gray-800">{telemetry.battery}%</span>
+              <span className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">DEVICE BATT</span>
+            </div>
           </div>
         </WhitePanel>
 
-        {/* API Settings Card */}
-        <WhitePanel title="Rivian API Integration">
+        {/* Rivian API Config Card */}
+        <WhitePanel title="Rivian API Config">
           <div className="flex flex-col gap-4">
-            <div className="flex justify-between items-center border-b border-gray-200 pb-3">
-              <div>
-                <div className="font-semibold text-gray-800">Vehicle Sync</div>
-                <div className="text-xs text-gray-500">Syncs battery and climate data</div>
-              </div>
-              <button onClick={() => setApiConnected(!apiConnected)}>
-                {apiConnected ? <ToggleRight size={32} className="text-cyan-500" /> : <ToggleLeft size={32} className="text-gray-400" />}
-              </button>
-            </div>
-            
-            <div className="flex justify-between items-center border-b border-gray-200 pb-3">
-              <div>
-                <div className="font-semibold text-gray-800">Location Sharing</div>
-                <div className="text-xs text-gray-500">Required for ABRP routing</div>
-              </div>
-              <ToggleRight size={32} className="text-cyan-500" />
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-gray-700">API Connection</span>
+              <label className="custom-switch">
+                <input type="checkbox" checked={apiConnected} onChange={(e) => setApiConnected(e.target.checked)} />
+                <span className="slider round"></span>
+              </label>
             </div>
 
-            <button className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors">
-              <RefreshCw size={18} /> Force Sync Now
-            </button>
+            <div className="space-y-3">
+              <div>
+                <input type="text" disabled={!apiConnected} className="w-full bg-white/50 border border-gray-200 rounded-lg px-4 py-2 text-sm text-gray-800 focus:outline-none focus:border-rivian-cyan transition-colors disabled:opacity-50" placeholder="user@example.com" />
+              </div>
+              <div>
+                <input type="password" disabled={!apiConnected} className="w-full bg-white/50 border border-gray-200 rounded-lg px-4 py-2 text-sm text-gray-800 focus:outline-none focus:border-rivian-cyan transition-colors disabled:opacity-50" placeholder="••••••••" />
+              </div>
+            </div>
           </div>
         </WhitePanel>
 
         {/* Replays Card */}
-        <WhitePanel title="Recent Drives">
-          <div className="flex flex-col gap-3">
-            <div className="bg-gray-100 rounded-xl p-3 flex justify-between items-center cursor-pointer hover:bg-gray-200 transition-colors">
-              <div>
-                <div className="font-bold text-gray-800">Home to Work</div>
-                <div className="text-xs text-gray-500">Today, 8:42 AM • 12 miles</div>
+        <WhitePanel title="Recent Replays">
+          <div className="flex flex-col gap-2">
+            {[1,2,3].map((i) => (
+              <div key={i} className="flex items-center justify-between p-3 bg-white/50 rounded-xl hover:bg-white transition-colors cursor-pointer border border-transparent hover:border-gray-200 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600">
+                    <VideoOff size={18} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-gray-800">Drive #{8042 - i}</span>
+                    <span className="text-[10px] text-gray-500 uppercase font-bold">{24 * i} mins ago</span>
+                  </div>
+                </div>
+                <button className="p-2 text-gray-400 hover:text-rivian-cyan transition-colors">
+                  <RefreshCw size={18} />
+                </button>
               </div>
-              <div className="bg-green-100 text-green-700 font-bold px-3 py-1 rounded-full text-xs">
-                Score: 98
-              </div>
-            </div>
-            
-            <div className="bg-gray-100 rounded-xl p-3 flex justify-between items-center cursor-pointer hover:bg-gray-200 transition-colors">
-              <div>
-                <div className="font-bold text-gray-800">Grocery Store</div>
-                <div className="text-xs text-gray-500">Yesterday, 5:15 PM • 4 miles</div>
-              </div>
-              <div className="bg-yellow-100 text-yellow-700 font-bold px-3 py-1 rounded-full text-xs">
-                Score: 84
-              </div>
-            </div>
-            
-            <button className="text-sm font-semibold text-cyan-600 text-center mt-2 hover:underline">
-              View All Replays
-            </button>
+            ))}
           </div>
         </WhitePanel>
-
       </div>
 
       <BottomDock />

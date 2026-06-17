@@ -57,8 +57,10 @@ rsync -am \
   --exclude='third_party/*x86*' \
   --exclude='third_party/*Darwin*' \
   --exclude='prebuilt_ap/' \
+  --exclude='* 2.*' \
+  --exclude='* 3.*' \
   --delete-excluded \
-  ./ $OUTPUT_DIR/
+  ./ $OUTPUT_DIR/ || true
 
 # 4. Prepare Git Repository for Push
 echo "[4/4] Preparing Git repository in $OUTPUT_DIR..."

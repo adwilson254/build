@@ -32,6 +32,8 @@ echo ">> Building full environment image with $ENGINE"
 echo ">> Building openpilot + running compiled tests in container"
 exec "$ENGINE" run --rm \
   -v "$REPO_ROOT:/work:z" \
+  -v openrivian-uv-cache:/root/.cache/uv \
+  -v openrivian-uv-python:/root/.local/share/uv \
   -w /work \
   -e PYTHONPATH=/work \
   "$IMAGE" \
@@ -41,11 +43,14 @@ exec "$ENGINE" run --rm \
     source .venv/bin/activate
     # Build the compiled bits the Rivian + replay tests need (CAN parsing, capnp).
     scons -j"$(nproc)" cereal opendbc_repo/opendbc
-    # antigravity suite via the isolated fast config (bypasses the root conftest,
-    # which needs params_pyx). With cereal/opendbc built and route data present,
-    # the scorerd replay test runs against real data instead of skipping.
-    pytest -c ci/pytest-fast.ini --rootdir /work tests/antigravity '"${PYTEST_ARGS:-}"'
-    # opendbc Rivian car-port tests (best-effort; use opendbc rootdir).
-    pytest --rootdir opendbc_repo -p no:cacheprovider --noconftest \
+    # 1. Pure/mocked unit tests. test_rivian_components mocks cereal in-process,
+    #    so the replay test (which needs REAL cereal) is excluded here.
+    python -m pytest -c ci/pytest-fast.ini --rootdir /work \
+      --ignore=tests/antigravity/test_scorerd_replay.py tests/antigravity '"${PYTEST_ARGS:-}"'
+    # 2. Route-replay test in isolation with real cereal + compiled LogReader.
+    python -m pytest -c ci/pytest-fast.ini --rootdir /work \
+      tests/antigravity/test_scorerd_replay.py
+    # 3. opendbc Rivian car-port tests (best-effort; uses opendbc rootdir).
+    python -m pytest --rootdir opendbc_repo -p no:cacheprovider --noconftest \
       opendbc_repo/opendbc/car/rivian/tests || echo "WARN: opendbc rivian car tests reported failures/errors"
   '

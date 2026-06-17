@@ -67,6 +67,8 @@ echo "[4/4] Preparing Git repository in $OUTPUT_DIR..."
 cd $OUTPUT_DIR
 git init
 git checkout -b ap
+git config user.email "bot@openrivian.com"
+git config user.name "OpenRivian Bot"
 git add .
 git commit -m "Auto-compiled prebuilt ap branch"
 

@@ -1,0 +1,21 @@
+{
+  "data": {
+    "vehicleState": {
+      "batteryLevel": { "value": 85.5 },
+      "distanceToEmpty": { "value": 320.0 },
+      "cabinClimateInteriorTemperature": { "value": 22.0 },
+      "doorFrontLeftClosed": { "value": "true" },
+      "doorFrontRightClosed": { "value": "true" },
+      "doorRearLeftClosed": { "value": "false" },
+      "doorRearRightClosed": { "value": "true" },
+      "vehicleMileage": { "value": 16093440.0 },
+      "tirePressureStatusFrontLeft": { "value": 38.0 },
+      "tirePressureStatusFrontRight": { "value": 38.0 },
+      "tirePressureStatusRearLeft": { "value": 39.0 },
+      "tirePressureStatusRearRight": { "value": 39.0 },
+      "powerState": { "value": "ready" },
+      "chargerStatus": { "value": "chrgr_sts_not_connected" },
+      "gnssLocation": { "latitude": 37.0, "longitude": -122.0 }
+    }
+  }
+}

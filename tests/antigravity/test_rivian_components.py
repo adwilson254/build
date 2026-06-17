@@ -17,6 +17,16 @@ sys.modules['aiohttp.web'] = MagicMock()
 sys.modules['serial'] = MagicMock()
 sys.modules['setproctitle'] = MagicMock()
 sys.modules['zstandard'] = MagicMock()
+# realtime pulls in system.hardware (platform-specific); mock it for the fast gate
+sys.modules['openpilot.common.realtime'] = MagicMock()
+
+# Golden fixtures captured/shaped from the real Rivian GraphQL API.
+FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures")
+
+
+def load_fixture(name):
+    with open(os.path.join(FIXTURES, name)) as f:
+        return json.load(f)
 
 # Mock Params completely so we don't load the compiled params_pyx.so
 mock_params = MagicMock()
@@ -89,20 +99,10 @@ class TestRivianComponents(unittest.TestCase):
         mock_params = MagicMock()
         mock_params.get.return_value = json.dumps({"access_token": "valid"}).encode('utf-8')
         
-        # Setup mock API response
+        # Setup mock API response from golden fixtures (real Rivian GraphQL shape)
         mock_api_instance = MockRivianApi.return_value
-        mock_api_instance.get_user_info.return_value = {
-            "data": {"currentUser": {"vehicles": [{"id": "rivian-1234"}]}}
-        }
-        mock_api_instance.get_vehicle_state.return_value = {
-            "data": {
-                "vehicleState": {
-                    "batteryLevel": {"value": 85.5},
-                    "doorFrontLeftClosed": {"value": "true"},
-                    "cabinClimateInteriorTemperature": {"value": 22.0} # Celsius
-                }
-            }
-        }
+        mock_api_instance.get_user_info.return_value = load_fixture("rivian_user_info.json")
+        mock_api_instance.get_vehicle_state.return_value = load_fixture("rivian_vehicle_state.json")
         
         # We must clear the fetch timer lock
         import openpilot.selfdrive.rivian.mqttd as mqttd

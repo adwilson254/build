@@ -1,0 +1,33 @@
+# Faithful OpenRivian build/test environment, mirroring upstream CI
+# (ubuntu:24.04 + tools/setup_dependencies.sh). Used for tests that need
+# compiled cereal/opendbc artifacts and for route-replay tests.
+#
+# The repo (with submodules + LFS objects) is bind-mounted at runtime by
+# run-full.sh so we do not bake source into the image. We only bake the system
+# toolchain + uv here.
+FROM docker.io/library/ubuntu:24.04
+
+ENV PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    LANG=en_US.UTF-8 \
+    LANGUAGE=en_US:en \
+    LC_ALL=en_US.UTF-8
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      sudo ca-certificates build-essential curl libcurl4-openssl-dev \
+      locales git git-lfs xvfb clang python3 python3-dev \
+    && sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
+    && locale-gen \
+    && rm -rf /var/lib/apt/lists/*
+
+# Run as root. Under rootless podman the host user maps to container root, so
+# the bind-mounted /work is writable (uv venv, scons build artifacts).
+RUN git config --system --add safe.directory '*'
+
+# Install uv (the dependency manager openpilot uses).
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
+
+WORKDIR /work
+ENV PYTHONPATH=/work
+ENTRYPOINT ["/bin/bash"]

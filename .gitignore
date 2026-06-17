@@ -94,3 +94,13 @@ SKILL.md
 !.idea/tools/*
 !.run/*
 prebuilt_ap/
+
+# OpenRivian: never commit node_modules (the built dist/ is what gets injected)
+**/node_modules/
+
+# Test caches
+.pytest_cache/
+
+# Replay route data captured from the device may contain GPS/PII - keep local
+tests/antigravity/routes/*
+!tests/antigravity/routes/README.md

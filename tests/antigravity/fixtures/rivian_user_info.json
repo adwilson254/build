@@ -1,0 +1,13 @@
+{
+  "data": {
+    "currentUser": {
+      "vehicles": [
+        {
+          "id": "VEHICLE-PLACEHOLDER-0001",
+          "vin": "0000000000000RIV1",
+          "name": "Test R1S"
+        }
+      ]
+    }
+  }
+}

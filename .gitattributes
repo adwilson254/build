@@ -11,6 +11,12 @@
 *.wav filter=lfs diff=lfs merge=lfs -text
 # ap_logo.png: keep out of LFS so clones (e.g. Comma) get it without LFS
 selfdrive/assets/images/ap_logo.png -filter -diff -merge
+# Rivian Web UI frontend assets: keep out of LFS so Comma clones install/build
+# without needing LFS objects (which aren't on a reachable LFS server).
+scripts/features/src/web_ui/frontend/**/*.svg -filter -diff -merge
+scripts/features/src/web_ui/frontend/**/*.png -filter -diff -merge
+selfdrive/web_ui/frontend/**/*.svg -filter -diff -merge
+selfdrive/web_ui/frontend/**/*.png -filter -diff -merge
 
 selfdrive/car/tests/test_models_segs.txt filter=lfs diff=lfs merge=lfs -text
 system/hardware/tici/updater_weston filter=lfs diff=lfs merge=lfs -text

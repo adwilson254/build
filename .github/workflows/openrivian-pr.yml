@@ -1,0 +1,48 @@
+name: OpenRivian PR gate
+
+# Lightweight, fork-friendly PR gate for OpenRivian. Validates the Rivian
+# tooling (cleaner + injectors + feature logic) with lint + the fast
+# pure-Python test suite. No full build, no LFS, no sunnypilot/comma infra --
+# the heavy upstream workflows (build release, unit tests, etc.) require
+# infrastructure this fork has no access to and are disabled here.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - tdd-pipeline
+  workflow_dispatch:
+
+concurrency:
+  group: openrivian-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fast-gate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout (no submodules, no LFS)
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test tooling
+        run: pip install ruff==0.15.4 pytest==8.3.4 requests==2.32.3 paho-mqtt==2.1.0
+
+      - name: Lint Rivian additions (bug-class rules)
+        run: |
+          ruff check --select F,E9,E722 \
+            --exclude scripts/features/src/rivian/ui_api_snippet.py \
+            scripts/features scripts/rivian_cleaner.py \
+            selfdrive/rivian tests/antigravity
+
+      - name: Fast test gate
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: pytest -c ci/pytest-fast.ini --rootdir "$GITHUB_WORKSPACE" tests/antigravity

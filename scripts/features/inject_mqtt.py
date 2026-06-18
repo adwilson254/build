@@ -66,14 +66,18 @@ def inject_mqtt(base_dir=None):
     with open(pyproject_path, 'r') as f:
         pyproject = f.read()
     
-    if '"paho-mqtt"' not in pyproject and "'paho-mqtt'" not in pyproject:
-        # Find dependencies = [ and inject it
-        pyproject = re.sub(r'(dependencies\s*=\s*\[)', r'\1\n  "paho-mqtt",', pyproject)
+    # mqttd needs both the amqtt broker and the paho client (see src/rivian/mqttd.py).
+    added_deps = []
+    for dep in ("amqtt", "paho-mqtt"):
+        if f'"{dep}"' not in pyproject and f"'{dep}'" not in pyproject:
+            pyproject = re.sub(r'(dependencies\s*=\s*\[)', r'\1\n  "' + dep + '",', pyproject, count=1)
+            added_deps.append(dep)
+    if added_deps:
         with open(pyproject_path, 'w') as f:
             f.write(pyproject)
-        print("Injected paho-mqtt into pyproject.toml")
+        print(f"Injected MQTT deps into pyproject.toml: {', '.join(added_deps)}")
     else:
-        print("paho-mqtt already exists in pyproject.toml")
+        print("MQTT deps already present in pyproject.toml")
 
     # Patch Developer UI for MQTT features
     developer_ui_path = os.path.join(base_dir, 'selfdrive', 'ui', 'mici', 'layouts', 'settings', 'developer.py')

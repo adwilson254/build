@@ -10,6 +10,7 @@ messaging system with external MQTT subscribers. It is specifically extended to:
 """
 import time
 import os
+import sys
 from openpilot.common.swaglog import cloudlog
 import asyncio
 import threading
@@ -20,6 +21,12 @@ from openpilot.common.realtime import Ratekeeper
 
 # Configure logging
 # MQTT dependencies are optional — if they fail to import, we run in degraded mode
+# On the comma device /usr/local/venv is read-only, so MQTT deps (amqtt/paho) are
+# installed into a writable target dir; add it to the path if present.
+_RIVIAN_DEPS = "/data/rivian_deps"
+if os.path.isdir(_RIVIAN_DEPS) and _RIVIAN_DEPS not in sys.path:
+  sys.path.append(_RIVIAN_DEPS)
+
 _mqtt_available = False
 try:
   from amqtt.broker import Broker

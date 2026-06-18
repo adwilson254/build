@@ -9,6 +9,7 @@ authors = [
 ]
 
 dependencies = [
+  "amqtt",
   "paho-mqtt",
   # multiple users
   "sounddevice",  # micd + soundd

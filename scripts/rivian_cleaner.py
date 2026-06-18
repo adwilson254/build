@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import re
 import shutil
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -28,7 +29,24 @@ def rename_disabled_directories(base_dir=BASE_DIR):
             os.rename(path, new_path)
             print(f"Disabled: {path} -> {new_path}")
 
-def clean_file_regex(filepath, allowed_brands):
+def _import_brand(line):
+    """Return the opendbc car brand a line imports from, else None.
+
+    Handles `from opendbc.car.<brand>...`, `from opendbc.sunnypilot.car.<brand>...`
+    and `import opendbc.car.<brand>...`. Non-brand submodules (interfaces, values,
+    common, ...) are returned as-is and filtered by the disabled-brand check.
+    """
+    for marker, idx in (("from opendbc.car.", 2), ("from opendbc.sunnypilot.car.", 3)):
+        if line.startswith(marker):
+            parts = line.split(".")
+            if len(parts) > idx:
+                return parts[idx].split(" ")[0].strip()
+    if "opendbc.car." in line and "import" in line:
+        return line.split("opendbc.car.")[1].split(".")[0].split(" ")[0].strip()
+    return None
+
+
+def clean_file_regex(filepath, allowed_brands, disabled_brands):
     if not os.path.exists(filepath):
         print(f"Skipping {filepath}, not found.")
         return
@@ -36,30 +54,29 @@ def clean_file_regex(filepath, allowed_brands):
     with open(filepath, 'r') as f:
         lines = f.readlines()
 
-    new_lines = []
-
+    # Pass 1: collect the aliases that disabled-brand imports introduce, e.g.
+    #   from opendbc.car.honda.values import CAR as HONDA   -> alias "HONDA"
+    # so we can also drop later references like `HONDA.ACURA_ILX` (e.g. in the
+    # MIGRATION dict), which would otherwise NameError once the import is gone.
+    removed_aliases = set()
     for line in lines:
-        # Check for imports
-        if line.startswith("from opendbc.car."):
-            brand = line.split(".")[2]
-            if brand not in allowed_brands and not brand.endswith('_disabled'):
-                continue
-        if line.startswith("from opendbc.sunnypilot.car."):
-            brand = line.split(".")[3]
-            if brand not in allowed_brands and not brand.endswith('_disabled'):
-                continue
-        
-        # We also need to strip specific legacy lines like from opendbc.car.xyz import ...
-        if "opendbc.car." in line and "import" in line:
-            parts = line.split("opendbc.car.")
-            if len(parts) > 1:
-                brand = parts[1].split(".")[0].split(" ")[0]
-                if brand not in allowed_brands and not brand.endswith('_disabled'):
-                    continue
-        
-        # Basic filtering for dictionaries
-        if "CAR." in line and not any(allowed.upper() in line for allowed in allowed_brands):
-            # This handles PLATFORMS = { CAR.HONDA: ... }
+        brand = _import_brand(line)
+        if brand in disabled_brands and " as " in line:
+            alias = line.split(" as ", 1)[1].strip().split()[0].rstrip(",")
+            if alias:
+                removed_aliases.add(alias)
+    alias_res = [re.compile(r"\b" + re.escape(a) + r"\.") for a in removed_aliases]
+
+    new_lines = []
+    for line in lines:
+        # Drop imports for actual disabled brands (never non-brand submodules).
+        if _import_brand(line) in disabled_brands:
+            continue
+        # Drop any line referencing a removed brand alias (MIGRATION entries, etc.).
+        if alias_res and any(r.search(line) for r in alias_res):
+            continue
+        # Drop dict entries referencing a disabled brand via CAR.<BRAND>.
+        if "CAR." in line and any(b.upper() in line for b in disabled_brands):
             continue
 
         if line.startswith("Platform ="):
@@ -123,10 +140,24 @@ def patch_sconscripts(base_dir=BASE_DIR):
             f.write(content)
         print(f"Patched SConscript: {path}")
 
+def disabled_brands(base_dir=BASE_DIR):
+    """Set of car brand names that have been disabled (renamed to *_disabled)."""
+    brands = set()
+    for car_dir in (os.path.join(base_dir, "opendbc_repo", "opendbc", "car"),
+                    os.path.join(base_dir, "opendbc_repo", "opendbc", "sunnypilot", "car")):
+        if not os.path.isdir(car_dir):
+            continue
+        for d in os.listdir(car_dir):
+            if d.endswith("_disabled") and os.path.isdir(os.path.join(car_dir, d)):
+                brands.add(d[:-len("_disabled")])
+    return brands
+
+
 def run_all(base_dir=BASE_DIR):
     rename_disabled_directories(base_dir)
-    clean_file_regex(os.path.join(base_dir, "opendbc_repo", "opendbc", "car", "values.py"), ALLOWED_CARS)
-    clean_file_regex(os.path.join(base_dir, "opendbc_repo", "opendbc", "car", "fingerprints.py"), ALLOWED_CARS)
+    disabled = disabled_brands(base_dir)
+    clean_file_regex(os.path.join(base_dir, "opendbc_repo", "opendbc", "car", "values.py"), ALLOWED_CARS, disabled)
+    clean_file_regex(os.path.join(base_dir, "opendbc_repo", "opendbc", "car", "fingerprints.py"), ALLOWED_CARS, disabled)
     copy_templates(base_dir)
     patch_sconscripts(base_dir)
 

@@ -54,17 +54,37 @@ def test_rename_is_idempotent(tmp_path):
 def test_clean_file_regex_strips_non_allowed_brand_imports(tmp_path):
     values = tmp_path / "values.py"
     values.write_text(
+        "from opendbc.car.interfaces import get_interface_attr\n"
         "from opendbc.car.honda.values import HONDA_CARS\n"
         "from opendbc.car.rivian.values import RIVIAN_CARS\n"
         "PLATFORM_HONDA = CAR.HONDA\n"
         "PLATFORM_RIVIAN = CAR.RIVIAN\n"
     )
-    cleaner.clean_file_regex(str(values), cleaner.ALLOWED_CARS)
+    # honda is disabled; rivian is allowed; interfaces is NOT a brand
+    cleaner.clean_file_regex(str(values), cleaner.ALLOWED_CARS, disabled_brands={"honda"})
     out = values.read_text()
-    assert "rivian" in out
-    assert "RIVIAN" in out
+    # the non-brand interfaces import MUST be preserved (regression: it was being
+    # stripped, leaving get_interface_attr undefined and crashing the manager)
+    assert "from opendbc.car.interfaces import get_interface_attr" in out
+    assert "rivian" in out and "RIVIAN" in out
     assert "honda" not in out
     assert "CAR.HONDA" not in out
+
+
+def test_clean_file_regex_preserves_non_brand_submodule_imports(tmp_path):
+    f = tmp_path / "f.py"
+    f.write_text(
+        "from opendbc.car.values import Platforms\n"
+        "from opendbc.car.common.conversions import Conversions\n"
+        "from opendbc.car.toyota.values import TOYOTA\n"
+        "import opendbc.car.fingerprints as fp\n"
+    )
+    cleaner.clean_file_regex(str(f), cleaner.ALLOWED_CARS, disabled_brands={"toyota"})
+    out = f.read_text()
+    assert "opendbc.car.values" in out
+    assert "opendbc.car.common.conversions" in out
+    assert "opendbc.car.fingerprints" in out
+    assert "toyota" not in out
 
 
 def test_patch_sconscripts_injects_once_and_is_idempotent(tmp_path):

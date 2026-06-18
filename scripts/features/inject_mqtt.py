@@ -87,7 +87,7 @@ def inject_mqtt(base_dir=None):
         
         dirty = False
         
-        if "self._mqtt_toggle = BigCircleParamControl" not in content:
+        if 'self._mqtt_toggle = BigParamControl("mqtt broker"' not in content:
             toggle_def = '    self._mqtt_toggle = BigParamControl("mqtt broker", "MqttEnabled")\n'
             anchor1 = '    self._adb_toggle = BigCircleParamControl'
             if anchor1 in content:

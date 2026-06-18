@@ -50,7 +50,7 @@ def inject_api(base_dir=None):
             snippet_path = os.path.join(src_dir, 'ui_api_snippet.py')
             with open(snippet_path, 'r') as f:
                 snippet = f.read()
-            toggle_def = '    self._rivian_toggle = BigCircleParamControl(gui_app.texture("icons_mici/api_short.png", 82, 82), "RivianApiEnabled", icon_offset=(0, 12))\n'
+            toggle_def = '    self._rivian_toggle = BigParamControl("rivian api", "RivianApiEnabled")\n'
             anchor1 = '    self._adb_toggle = BigCircleParamControl'
             if anchor1 in content:
                 content = content.replace(anchor1, snippet + "\n" + toggle_def + anchor1)

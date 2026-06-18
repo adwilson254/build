@@ -266,3 +266,35 @@ def test_injected_process_config_is_import_safe(base):
                 if root not in available:
                     unresolved.append(f"{node.name}: {root}")
     assert not unresolved, f"injected annotations not import-safe: {unresolved}"
+
+
+import re as _re
+
+ASSETS_ROOT = os.path.join(REPO_ROOT, "selfdrive", "assets")
+DEVELOPER_REAL = os.path.join(
+    REPO_ROOT, "selfdrive", "ui", "mici", "layouts", "settings", "developer.py"
+)
+
+
+def _texture_refs(src):
+    """All asset paths referenced via gui_app.texture("...") in source text."""
+    return _re.findall(r'gui_app\.texture\(\s*"([^"]+)"', src)
+
+
+@pytest.mark.skipif(not os.path.exists(DEVELOPER_REAL), reason="developer.py not present on this branch")
+def test_developer_texture_assets_exist():
+    """Every gui_app.texture("...") in the real developer.py must point at an
+    asset that actually exists.
+
+    This guards the bug class that took the device down: an injected toggle
+    referenced icons_mici/api_short.png / mqtt_short.png which don't exist, so
+    the missing texture had orig_width=0 -> ZeroDivisionError at boot. Static
+    parsing and container builds never caught it because the asset is only
+    resolved at UI render time on-device.
+    """
+    src = open(DEVELOPER_REAL).read()
+    missing = [
+        ref for ref in _texture_refs(src)
+        if not os.path.exists(os.path.join(ASSETS_ROOT, ref))
+    ]
+    assert not missing, f"developer.py references missing texture assets: {missing}"

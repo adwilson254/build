@@ -130,8 +130,8 @@ class DeveloperLayoutMici(NavScroller):
 
     self._rivian_login_btn.set_click_callback(rivian_login_callback)
 
-    self._rivian_toggle = BigCircleParamControl(gui_app.texture("icons_mici/api_short.png", 82, 82), "RivianApiEnabled", icon_offset=(0, 12))
-    self._mqtt_toggle = BigCircleParamControl(gui_app.texture("icons_mici/mqtt_short.png", 82, 82), "MqttEnabled", icon_offset=(0, 12))
+    self._rivian_toggle = BigParamControl("rivian api", "RivianApiEnabled")
+    self._mqtt_toggle = BigParamControl("mqtt broker", "MqttEnabled")
     self._adb_toggle = BigCircleParamControl(gui_app.texture("icons_mici/adb_short.png", 82, 82), "AdbEnabled", icon_offset=(0, 12))
     self._ssh_toggle = BigCircleParamControl(gui_app.texture("icons_mici/ssh_short.png", 82, 82), "SshEnabled", icon_offset=(0, 12))
     self._joystick_toggle = BigToggle("joystick debug mode",

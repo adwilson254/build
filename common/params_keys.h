@@ -6,6 +6,12 @@
 #include "cereal/gen/cpp/log.capnp.h"
 
 inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
+    {"RivianSmoothnessScore", {CLEAR_ON_MANAGER_START, FLOAT, "100.0"}},
+    {"RivianPathAccuracyScore", {CLEAR_ON_MANAGER_START, FLOAT, "100.0"}},
+    {"MqttEnabled", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"RivianApiEnabled", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"RivianApiToken", {PERSISTENT | DONT_LOG | BACKUP, STRING}},
+    {"RivianApiStatus", {CLEAR_ON_MANAGER_START, STRING, "Unconfigured"}},
     {"AccessToken", {CLEAR_ON_MANAGER_START | DONT_LOG, STRING}},
     {"AdbEnabled", {PERSISTENT | BACKUP, BOOL}},
     {"AlwaysOnDM", {PERSISTENT | BACKUP, BOOL}},

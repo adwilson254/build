@@ -30,7 +30,11 @@ class WebServer:
 
     async def get_param(self, request):
         key = request.match_info['key']
-        val = self.params.get(key)
+        try:
+            val = self.params.get(key)
+        except Exception:
+            val = None
+
         if val is None:
             return web.json_response({'error': 'Not found'}, status=404)
         
@@ -48,10 +52,13 @@ class WebServer:
             return web.json_response({'error': 'Missing value'}, status=400)
             
         val = data['value']
-        if isinstance(val, bool):
-            self.params.put_bool(key, val)
-        else:
-            self.params.put(key, str(val))
+        try:
+            if isinstance(val, bool):
+                self.params.put_bool(key, val)
+            else:
+                self.params.put(key, str(val))
+        except Exception as e:
+            return web.json_response({'error': str(e)}, status=400)
             
         return web.json_response({'success': True})
 
